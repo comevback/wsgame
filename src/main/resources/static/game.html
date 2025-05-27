@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Game</title>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+    <style>
+        canvas { border: 1px solid black; background-color: #fafafa; }
+    </style>
+</head>
+<body>
+<h2>🎮Game</h2>
+<!--<label for="playerEmoji">好きな絵文字を選んでください:</label><br>-->
+<select id="emojiSelect">
+    <option value="🐱">🐱</option>
+    <option value="🚗">🚗</option>
+    <option value="🦄">🦄</option>
+    <option value="🌟">🌟</option>
+    <option value="🍕">🍕</option>
+    <option value="🎉">🎉</option>
+    <option value="💻">💻</option>
+    <option value="🏀">🏀</option>
+    <option value="⚽">⚽</option>
+    <option value="🎮">🎮</option>
+    <option value="🎵">🎵</option>
+    <option value="🌈">🌈</option>
+    <option value="🌍">🌍</option>
+    <option value="🌸">🌸</option>
+    <option value="🍩">🍩</option>
+    <option value="🍎">🍎</option>
+    <option value="🍉">🍉</option>
+    <option value="🍓">🍓</option>
+</select>
+<input id="playerEmoji" type="text" placeholder="例: 🐱, 🚗, 🦄">
+<p id="playerIdLabel">あなたのID: <span id="playerId"></span></p>
+<div id="gameArea">
+    <canvas id="canvas" width="800" height="400"></canvas>
+    <div id="chat">
+        <div id="chatMessages">
+            <!-- 聊天消息会在这里显示 -->
+        </div>
+        <div id="chatInputArea">
+            <input id="chatInput" type="text" placeholder="Type a message...">
+            <button id="sendButton">Send</button>
+        </div>
+    </div>
+</div>
+
+<style>
+    #gameArea {
+        display: flex;
+        align-items: start;
+        justify-content: start;
+        gap: 5rem;
+    }
+
+    #chat {
+        display: flex;
+        flex-direction: column;
+        height: 400px;
+        width: 500px;
+        border: 1px solid #ccc;
+        overflow-y: auto;
+        border-radius: 5px;
+    }
+
+    #chatMessages {
+        flex-grow: 1;
+        border: 1px solid beige;
+        overflow-y: auto;
+        height: 300px;
+        border-radius: 5px;
+        margin-top: 5px;
+        margin-bottom: 5px;
+        padding: 10px;
+    }
+
+    .chat-message {
+        padding: 8px 12px;
+        border-radius: 10px;
+        margin: 5px 0;
+        color: #fff;
+        max-width: 90%;          /* ✅ 限制最大宽度，防止超出 */
+        word-break: break-word;  /* ✅ 强制长单词换行（如 URL 或长文本） */
+        white-space: pre-wrap;   /* ✅ 保留空格和换行并自动换行 */
+    }
+
+    #chatInput {
+        flex: 1;
+        padding: 8px 12px;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        font-size: 14px;
+        outline: none;
+        box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+        transition: border-color 0.3s;
+    }
+
+    #chatInput:focus {
+        border-color: #007BFF;
+    }
+
+    #sendButton {
+        padding: 8px 16px;
+        background-color: #007BFF;
+        border: none;
+        border-radius: 8px;
+        color: white;
+        font-weight: bold;
+        font-size: 14px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+    }
+
+    #sendButton:hover {
+        background-color: #0056b3;
+    }
+
+</style>
+
+<script>
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    const playerId = 'P' + Math.floor(Math.random() * 10000);
+    document.getElementById("playerId").textContent = playerId;
+
+    const player = {
+        id: playerId,
+        x: 400,
+        y: 200,
+        size: 30,
+        color: "blue",
+        speed: 3,
+        dx: 0,
+        dy: 0,
+        emoji: "🐱"
+    };
+
+    const otherPlayers = {};
+    const keys = {};
+
+    window.addEventListener("keydown", function(e) {
+        keys[e.key] = true;
+        if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) e.preventDefault();
+    });
+
+    window.addEventListener("keyup", function(e) {
+        keys[e.key] = false;
+    });
+
+    function handleInput() {
+        player.dx = 0;
+        player.dy = 0;
+        if (keys["ArrowLeft"]) player.dx = -player.speed;
+        if (keys["ArrowRight"]) player.dx = player.speed;
+        if (keys["ArrowUp"]) player.dy = -player.speed;
+        if (keys["ArrowDown"]) player.dy = player.speed;
+    }
+
+    function updatePlayerPosition() {
+        const input = document.getElementById("emojiSelect");
+        if (input) {
+            player.emoji = input.value || "🐱";
+        }
+        player.x += player.dx;
+        player.y += player.dy;
+        const maxX = canvas.width;
+        const maxY = canvas.height + player.size/2;
+        player.x = Math.max(player.size/2, Math.min(player.x, maxX));
+        player.y = Math.max(player.size/2, Math.min(player.y, maxY));
+    }
+
+    function drawPlayer(p) {
+        ctx.font = "14px Arial";
+        ctx.fillStyle = p.color;
+        ctx.textAlign = "center";
+        ctx.fillText(p.id, p.x, p.y - 30);
+        ctx.font = player.size + "px serif";
+        ctx.fillText(p.emoji || "😀", p.x, p.y);
+    }
+
+    function drawScene() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawPlayer(player);
+        for (const id in otherPlayers) {
+            if (id !== player.id) drawPlayer(otherPlayers[id]);
+        }
+    }
+
+    function update() {
+        handleInput();
+        updatePlayerPosition();
+        drawScene();
+        requestAnimationFrame(update);
+    }
+
+    document.getElementById("chatInput").addEventListener("keydown", function(event) {
+        if (event.key === "Enter") {
+            event.preventDefault(); // 阻止换行
+            document.getElementById("sendButton").click(); // 触发点击事件
+        }
+    });
+
+    // WebSocket
+    const socket = new SockJS("/ws");
+    // 使用 Stomp 协议来处理 WebSocket 消息
+    const stompClient = Stomp.over(socket);
+
+    // 建立连接后执行的回调函数
+    stompClient.connect({}, () => {
+
+        // ✅ 1. 订阅广播频道 "/topic/players"
+        //    服务器会把所有玩家的位置广播到这个频道
+        stompClient.subscribe("/topic/players", message => {
+
+            // 解析服务器发送来的 JSON 数据
+            const incoming = JSON.parse(message.body);
+
+            // 如果这个数据不是自己（本地控制的 player），就认为是其他玩家的位置
+            if (incoming.id !== player.id) {
+                // 将其存到 otherPlayers 字典中（key 是 id）
+                // 后续你会在画面中绘制这些 otherPlayers
+                otherPlayers[incoming.id] = incoming;
+            }
+        });
+
+        // ✅ 3. 订阅 "/topic/messages" 频道
+        //    服务器会把聊天消息广播到这个频道
+        stompClient.subscribe("/topic/messages", message => {
+            const chat = JSON.parse(message.body);
+            const chatMessages = document.getElementById("chatMessages");
+
+            const msgDiv = document.createElement("div");
+            msgDiv.className = "chat-message";
+
+            // 🌈 设置随机背景色
+            const colors = ["#007BFF", "#28A745", "#FFC107", "#DC3545", "#17A2B8", "#6610f2", "#e83e8c"];
+            const bgColor = colors[Math.floor(Math.random() * colors.length)];
+            msgDiv.style.backgroundColor = bgColor;
+
+            msgDiv.textContent = `${chat.sender}: ${chat.content}`;
+            chatMessages.appendChild(msgDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        });
+
+
+        // 发送聊天消息的按钮点击事件
+        document.getElementById("sendButton").addEventListener("click", () => {
+            const chatInput = document.getElementById("chatInput");
+            const content = chatInput.value.trim();
+            if (content) {
+                // 发送聊天消息到服务器
+                stompClient.send("/app/chat", {}, JSON.stringify({
+                    sender: player.id,
+                    content: content
+                }));
+                chatInput.value = ""; // 清空输入框
+            }
+        });
+
+        // ✅ 2. 每隔 20 毫秒（即每秒 50 次），将自己的位置发送给服务器
+        //    这样服务器就能广播你的位置给其他人
+        setInterval(() => {
+            // 把自己当前的 player 对象转为字符串发给 "/app/move"
+            stompClient.send("/app/move", {}, JSON.stringify(player));
+        }, 20);
+    });
+
+    update();
+</script>
+</body>
+</html>
