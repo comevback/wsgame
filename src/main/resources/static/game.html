@@ -124,7 +124,7 @@
     const canvas = document.getElementById("canvas");
     const ctx = canvas.getContext("2d");
     const playerId = 'P' + Math.floor(Math.random() * 10000);
-    const otherPlayers = {};
+    let otherPlayers = {};
     const keys = {};
     document.getElementById("playerId").textContent = playerId;
     const items = [];  // 所有道具对象
@@ -236,17 +236,15 @@
         // ✅ 1. 订阅广播频道 "/topic/players"
         //    服务器会把所有玩家的位置广播到这个频道
         stompClient.subscribe("/topic/players", message => {
-
-            // 解析服务器发送来的 JSON 数据
-            const incoming = JSON.parse(message.body);
-
-            // 如果这个数据不是自己（本地控制的 player），就认为是其他玩家的位置
-            if (incoming.id !== player.id) {
-                // 将其存到 otherPlayers 字典中（key 是 id）
-                // 后续你会在画面中绘制这些 otherPlayers
-                otherPlayers[incoming.id] = incoming;
-            }
+            const playerList = JSON.parse(message.body);
+            otherPlayers = {}; // 清空原有
+            playerList.forEach(p => {
+                if (p.id !== player.id) {
+                    otherPlayers[p.id] = p;
+                }
+            });
         });
+
 
         // ✅ 3. 订阅 "/topic/messages" 频道
         //    服务器会把聊天消息广播到这个频道
