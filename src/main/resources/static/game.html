@@ -279,12 +279,22 @@
             }
         });
 
+        stompClient.subscribe("/topic/items", message => {
+            const item = JSON.parse(message.body);
+            items.push(item);
+        });
+
         // ✅ 2. 每隔 20 毫秒（即每秒 50 次），将自己的位置发送给服务器
         //    这样服务器就能广播你的位置给其他人
         setInterval(() => {
             // 把自己当前的 player 对象转为字符串发给 "/app/move"
             stompClient.send("/app/move", {}, JSON.stringify(player));
         }, 20);
+
+        stompClient.subscribe("/topic/count", message => {
+            const count = message.body;
+            document.getElementById("onlineCount").textContent = `🟢 現在のプレイヤー数: ${count}`;
+        });
     });
 
     function checkItemCollision() {
@@ -293,6 +303,7 @@
             const dx = player.x - item.x;
             const dy = player.y - item.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
+            console.log(distance);
             if (distance < (player.size / 2 + item.size / 2)) {
                 items.splice(i, 1);  // 吃掉道具
                 score += 10;
@@ -301,19 +312,19 @@
         }
     }
 
-    setInterval(() => {
-        if (items.length < 5) {  // 最多 5 个道具
-            createRandomItem();
-        }
-    }, 3000);  // 每 3 秒尝试添加一个
+    // setInterval(() => {
+    //     fetch("/player/count")
+    //         .then(res => res.text())
+    //         .then(count => {
+    //             document.getElementById("onlineCount").textContent = `🟢 現在のプレイヤー数: ${count}`;
+    //         });
+    // }, 3000);
 
-    setInterval(() => {
-        fetch("/player/count")
-            .then(res => res.text())
-            .then(count => {
-                document.getElementById("onlineCount").textContent = `🟢 現在のプレイヤー数: ${count}`;
-            });
-    }, 3000);
+    // setInterval(() => {
+    //     if (items.length < 5) {  // 最多 5 个道具
+    //         createRandomItem();
+    //     }
+    // }, 3000);  // 每 3 秒尝试添加一个
 
     update();
 </script>

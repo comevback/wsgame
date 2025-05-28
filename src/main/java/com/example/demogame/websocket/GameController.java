@@ -7,6 +7,7 @@ import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.SendTo;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
@@ -42,8 +43,10 @@ public class GameController {
         return message;
     }
 
-    @GetMapping("/player/count")
-    @ResponseBody
+//    @GetMapping("/player/count")
+//    @ResponseBody
+    @Scheduled(fixedRate = 1000) // 每1秒更新一次玩家数量
+    @SendTo("/topic/count")
     public int getPlayerCount() {
         return WebSocketEventListener.connectedPlayers.size();
     }
