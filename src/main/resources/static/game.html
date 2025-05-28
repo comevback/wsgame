@@ -11,7 +11,6 @@
 </head>
 <body>
 <h2>🎮Game</h2>
-<!--<label for="playerEmoji">好きな絵文字を選んでください:</label><br>-->
 <select id="emojiSelect">
     <option value="🐱">🐱</option>
     <option value="🚗">🚗</option>
@@ -33,10 +32,12 @@
     <option value="🍓">🍓</option>
 </select>
 <input id="playerEmoji" type="text" placeholder="例: 🐱, 🚗, 🦄">
+<p id="onlineCount">🟢 現在のプレイヤー数: 0</p>
 <p id="playerIdLabel">あなたのID: <span id="playerId"></span></p>
+<p id="score">Score: 0</p>
 <div id="gameArea">
     <canvas id="canvas" width="800" height="400"></canvas>
-    <div id="chat">
+    <div id="chatArea">
         <div id="chatMessages">
             <!-- 聊天消息会在这里显示 -->
         </div>
@@ -55,11 +56,11 @@
         gap: 5rem;
     }
 
-    #chat {
+    #chatArea {
         display: flex;
         flex-direction: column;
         height: 400px;
-        width: 500px;
+        min-width: 500px;
         border: 1px solid #ccc;
         overflow-y: auto;
         border-radius: 5px;
@@ -123,7 +124,11 @@
     const canvas = document.getElementById("canvas");
     const ctx = canvas.getContext("2d");
     const playerId = 'P' + Math.floor(Math.random() * 10000);
+    const otherPlayers = {};
+    const keys = {};
     document.getElementById("playerId").textContent = playerId;
+    const items = [];  // 所有道具对象
+    let score = 0;
 
     const player = {
         id: playerId,
@@ -137,8 +142,15 @@
         emoji: "🐱"
     };
 
-    const otherPlayers = {};
-    const keys = {};
+    function createRandomItem() {
+        const item = {
+            x: Math.random() * (canvas.width - 20) + 10,
+            y: Math.random() * (canvas.height - 20) + 10,
+            size: 20,
+            emoji: "🍎", // 你可以用任何 emoji
+        };
+        items.push(item);
+    }
 
     window.addEventListener("keydown", function(e) {
         keys[e.key] = true;
@@ -160,8 +172,9 @@
 
     function updatePlayerPosition() {
         const input = document.getElementById("emojiSelect");
-        if (input) {
-            player.emoji = input.value || "🐱";
+        const playerEmojiInput = document.getElementById("playerEmoji");
+        if (input || playerEmojiInput) {
+            player.emoji = playerEmojiInput.value || input.value || "🐱";
         }
         player.x += player.dx;
         player.y += player.dy;
@@ -180,9 +193,17 @@
         ctx.fillText(p.emoji || "😀", p.x, p.y);
     }
 
+    function drawItems() {
+        items.forEach(item => {
+            ctx.font = item.size + "px serif";
+            ctx.fillText(item.emoji, item.x, item.y);
+        });
+    }
+
     function drawScene() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         drawPlayer(player);
+        drawItems();
         for (const id in otherPlayers) {
             if (id !== player.id) drawPlayer(otherPlayers[id]);
         }
@@ -191,6 +212,7 @@
     function update() {
         handleInput();
         updatePlayerPosition();
+        checkItemCollision();
         drawScene();
         requestAnimationFrame(update);
     }
@@ -206,6 +228,7 @@
     const socket = new SockJS("/ws");
     // 使用 Stomp 协议来处理 WebSocket 消息
     const stompClient = Stomp.over(socket);
+    stompClient.debug = null;
 
     // 建立连接后执行的回调函数
     stompClient.connect({}, () => {
@@ -244,7 +267,6 @@
             chatMessages.scrollTop = chatMessages.scrollHeight;
         });
 
-
         // 发送聊天消息的按钮点击事件
         document.getElementById("sendButton").addEventListener("click", () => {
             const chatInput = document.getElementById("chatInput");
@@ -266,6 +288,34 @@
             stompClient.send("/app/move", {}, JSON.stringify(player));
         }, 20);
     });
+
+    function checkItemCollision() {
+        for (let i = items.length - 1; i >= 0; i--) {
+            const item = items[i];
+            const dx = player.x - item.x;
+            const dy = player.y - item.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            if (distance < (player.size / 2 + item.size / 2)) {
+                items.splice(i, 1);  // 吃掉道具
+                score += 10;
+                document.getElementById("score").textContent = `Score: ${score}`;
+            }
+        }
+    }
+
+    setInterval(() => {
+        if (items.length < 5) {  // 最多 5 个道具
+            createRandomItem();
+        }
+    }, 3000);  // 每 3 秒尝试添加一个
+
+    setInterval(() => {
+        fetch("/player/count")
+            .then(res => res.text())
+            .then(count => {
+                document.getElementById("onlineCount").textContent = `🟢 現在のプレイヤー数: ${count}`;
+            });
+    }, 3000);
 
     update();
 </script>

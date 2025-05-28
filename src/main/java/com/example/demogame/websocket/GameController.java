@@ -6,6 +6,8 @@ import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.SendTo;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ResponseBody;
 
 @Controller
 public class GameController {
@@ -21,5 +23,11 @@ public class GameController {
     @SendTo("/topic/messages")
     public Message MessageCenter(Message message){
         return message;
+    }
+
+    @GetMapping("/player/count")
+    @ResponseBody
+    public int getPlayerCount() {
+        return WebSocketEventListener.connectedPlayers.size();
     }
 }
